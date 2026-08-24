@@ -5,32 +5,47 @@ import { useRouter } from 'next/navigation';
 import ConfettiCanvas from './ConfettiCanvas';
 
 type Fields = { name: string; email: string; whatsapp: string; business: string; url: string; message: string };
+type FieldKey = keyof Fields;
 const initial: Fields = { name: '', email: '', whatsapp: '', business: '', url: '', message: '' };
 
 export default function CTAForm() {
   const [fields, setFields] = useState<Fields>(initial);
-  const [errors, setErrors] = useState<Partial<Record<keyof Fields, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
+  const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const [burstOrigin, setBurstOrigin] = useState<{ x: number; y: number }>();
   const redirectTimer = useRef<number>();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const fieldRefs = useRef<Partial<Record<FieldKey, HTMLInputElement | HTMLTextAreaElement>>>({});
   const router = useRouter();
-  const update = (key: keyof Fields, value: string) => setFields((current) => ({ ...current, [key]: value }));
+
   useEffect(() => () => { if (redirectTimer.current) window.clearTimeout(redirectTimer.current); }, []);
+  const update = (key: FieldKey, value: string) => setFields((current) => ({ ...current, [key]: value }));
+  const validate = (current: Fields) => {
+    const next: Partial<Record<FieldKey, string>> = {};
+    if (!current.name.trim()) next.name = 'Please enter your full name.';
+    if (!/^\S+@\S+\.\S+$/.test(current.email)) next.email = 'Please enter a valid email address.';
+    const phone = current.whatsapp.replace(/\D/g, '');
+    if (phone.length < 7 || phone.length > 12) next.whatsapp = 'Please enter a valid WhatsApp number.';
+    if (!current.business.trim()) next.business = 'Please enter your business or industry.';
+    return next;
+  };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting || success) return;
-    const next: typeof errors = {};
-    if (!fields.name.trim()) next.name = 'Please enter your full name.';
-    if (!/^\S+@\S+\.\S+$/.test(fields.email)) next.email = 'Please enter a valid email.';
-    if (!fields.whatsapp.trim()) next.whatsapp = 'Please enter your WhatsApp number.';
-    if (!fields.business.trim()) next.business = 'Please enter your business name.';
+    setSubmitted(true);
+    const next = validate(fields);
     setErrors(next);
-    if (Object.keys(next).length) return;
+    if (Object.keys(next).length) {
+      const first = Object.keys(next)[0] as FieldKey;
+      window.requestAnimationFrame(() => fieldRefs.current[first]?.focus());
+      return;
+    }
     setSubmitting(true);
-    // The existing project has no backend endpoint, so a valid local submission is its current success confirmation.
+    // Existing project has no API route; retain its current local-success redirect behavior.
     await Promise.resolve();
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) setBurstOrigin({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
@@ -38,16 +53,22 @@ export default function CTAForm() {
     setConfettiTrigger((value) => value + 1);
     redirectTimer.current = window.setTimeout(() => router.push('/thank-you'), 2400);
   };
-  const input = (key: keyof Fields, label: string, placeholder: string, required = false, type = 'text') => <label className="block text-sm font-semibold text-slate-700">{label}{required && <span className="text-brand-600"> *</span>}<input className="input mt-2 font-normal" type={type} value={fields[key]} onChange={(e) => update(key, e.target.value)} placeholder={placeholder} required={required} aria-invalid={!!errors[key]} />{errors[key] && <span className="mt-1 block text-xs font-normal text-red-600">{errors[key]}</span>}</label>;
-  return <form onSubmit={submit} noValidate className="relative space-y-5 rounded-[2rem] bg-white p-5 shadow-soft sm:p-8"><ConfettiCanvas trigger={confettiTrigger} duration={2400} zIndex={20} origin={burstOrigin} />
-    {input('name', 'Full Name', 'Your full name', true)}
-    {input('email', 'Active Email', 'you@example.com', true, 'email')}
-    {input('whatsapp', 'WhatsApp Number', 'Your WhatsApp number', true, 'tel')}
-    {input('business', 'Business Name', 'Your business name', true)}
-    {input('url', 'Website or Facebook URL', 'https://...', false, 'url')}
-    <label className="block text-sm font-semibold text-slate-700">Anything You Want to Say<textarea className="input mt-2 min-h-32 resize-y font-normal" value={fields.message} onChange={(e) => update('message', e.target.value)} placeholder="Tell us a little about your business" /></label>
-    {success && <p className="text-center text-base font-bold text-brand-700" role="status" aria-live="polite">Booking Successful!</p>}
-    <button ref={buttonRef} type="submit" disabled={submitting || success} className="min-h-14 w-full rounded-full bg-brand-600 px-6 text-base font-bold text-white shadow-lg shadow-brand-600/20 transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70 focus:outline-none focus:ring-4 focus:ring-brand-500/30">{success ? 'Booking Successful!' : submitting ? 'Submitting…' : 'Book Free Consultation'}</button>
-    <p className="text-center text-xs text-slate-500">We respect your privacy. No spam.</p>
+  const showError = (key: FieldKey) => (submitted || touched[key]) && errors[key];
+  const input = (key: FieldKey, label: string, placeholder: string, options: { required?: boolean; type?: string; autoComplete?: string } = {}) => {
+    const errorId = `${key}-error`;
+    return <label className="form-label" htmlFor={key}>{label}{options.required && <span className="required-mark"> *</span>}<input id={key} name={key} ref={(element) => { if (element) fieldRefs.current[key] = element; }} className="input" type={options.type ?? 'text'} value={fields[key]} onChange={(event) => update(key, event.target.value)} onBlur={() => setTouched((current) => ({ ...current, [key]: true }))} placeholder={placeholder} required={options.required} autoComplete={options.autoComplete} aria-invalid={!!showError(key)} aria-describedby={showError(key) ? errorId : undefined} />{showError(key) && <span id={errorId} className="field-error" role="alert">{errors[key]}</span>}</label>;
+  };
+  return <form onSubmit={submit} noValidate className="glass-card form-card"><ConfettiCanvas trigger={confettiTrigger} duration={2400} zIndex={20} origin={burstOrigin} />
+    {submitted && Object.keys(errors).length > 0 && <div className="error-summary" role="alert" tabIndex={-1}>Please review the highlighted fields before continuing.</div>}
+    {input('name', 'Full Name', 'Your full name', { required: true, autoComplete: 'name' })}
+    {input('email', 'Email Address', 'you@example.com', { required: true, type: 'email', autoComplete: 'email' })}
+    <label className="form-label" htmlFor="whatsapp">WhatsApp Number<span className="required-mark"> *</span><div className="phone-field"><span className="country-prefix">+977</span><input id="whatsapp" name="whatsapp" ref={(element) => { if (element) fieldRefs.current.whatsapp = element; }} className="input phone-input" type="tel" value={fields.whatsapp} onChange={(event) => update('whatsapp', event.target.value.replace(/[^\d\s-]/g, ''))} onBlur={() => setTouched((current) => ({ ...current, whatsapp: true }))} placeholder="9747533326" required autoComplete="tel-national" inputMode="tel" aria-invalid={!!showError('whatsapp')} aria-describedby={showError('whatsapp') ? 'whatsapp-error' : undefined} /></div>{showError('whatsapp') && <span id="whatsapp-error" className="field-error" role="alert">{errors.whatsapp}</span>}</label>
+    {input('business', 'Business Name or Industry', 'Your business or industry', { required: true, autoComplete: 'organization' })}
+    {input('url', 'Website or Facebook URL', 'https://...', { type: 'url', autoComplete: 'url' })}
+    <label className="form-label" htmlFor="message">What is your biggest marketing challenge?<textarea id="message" name="message" ref={(element) => { if (element) fieldRefs.current.message = element; }} className="input textarea" value={fields.message} onChange={(event) => update('message', event.target.value)} onBlur={() => setTouched((current) => ({ ...current, message: true }))} placeholder="Tell us what you are working through" autoComplete="off" /></label>
+    {success && <p className="success-message" role="status" aria-live="polite">Request received — thank you!</p>}
+    <button ref={buttonRef} type="submit" disabled={submitting || success} className="primary-cta form-submit">{success ? 'Request Received' : submitting ? 'Submitting...' : 'Book Free Consultation'}</button>
+    <p className="privacy-note">By submitting this form, you agree to be contacted regarding your consultation request. Your information will not be sold or shared.</p>
+    <p className="privacy-note">We respect your privacy. No spam. <a href="/privacy-policy" className="inline-link">Read our Privacy Policy.</a></p>
   </form>;
 }

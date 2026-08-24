@@ -27,5 +27,5 @@ export default function WelcomeIntro() {
     if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); activate(); }
   };
   if (!visible) return null;
-  return <div className="welcome-intro"><ConfettiCanvas trigger={confettiTrigger} duration={1900} zIndex={60} sideBursts={false} /><button type="button" className="welcome-word" onClick={activate} onKeyDown={onKeyDown} aria-label="Welcome — click to continue">Welcome</button></div>;
+  return <div className="welcome-intro" onClick={(event) => { if (event.target === event.currentTarget) activate(); }}><ConfettiCanvas trigger={confettiTrigger} duration={1900} zIndex={60} sideBursts={false} /><div className="welcome-content"><button type="button" className="welcome-word" onClick={activate} onKeyDown={onKeyDown} aria-label="Welcome — click to continue">WELCOME</button><p className="welcome-instruction"><span className="click-icon" aria-hidden="true">☝</span>Click once to explore</p></div></div>;
 }
