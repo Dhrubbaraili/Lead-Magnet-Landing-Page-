@@ -3,15 +3,26 @@
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import ConfettiCanvas from './ConfettiCanvas';
 
+const welcomeSessionKey = 'ai-marketing-dhrub-welcome-seen';
+let welcomeClaimedInRuntime = false;
+
 export default function WelcomeIntro() {
   const [visible, setVisible] = useState(false);
   const [confettiTrigger, setConfettiTrigger] = useState(0);
   const closing = useRef(false);
 
   useEffect(() => {
-    const key = 'ai-marketing-dhrub-welcome-seen';
-    if (window.sessionStorage.getItem(key)) return;
-    window.sessionStorage.setItem(key, 'true');
+    if (welcomeClaimedInRuntime) return;
+    try {
+      if (window.sessionStorage.getItem(welcomeSessionKey)) {
+        welcomeClaimedInRuntime = true;
+        return;
+      }
+      window.sessionStorage.setItem(welcomeSessionKey, 'true');
+    } catch {
+      // Keep the in-memory guard active if storage is unavailable.
+    }
+    welcomeClaimedInRuntime = true;
     setVisible(true);
     const timer = window.setTimeout(() => setVisible(false), 4000);
     return () => window.clearTimeout(timer);
