@@ -7,6 +7,8 @@ const redirectConfig = 'eyJ0cmlnZ2VyIjp7Im1vZGUiOiJpbW1lZGlhdGVseSIsInZhbHVlIjow
 export default function CTAForm() {
   const embedPath = path.join(process.cwd(), 'components', 'flodesk-embed.html');
   const source = readFileSync(embedPath, 'utf8');
-  const embed = source.replace(/data-ff-config="[^"]+"/, `data-ff-config="${redirectConfig}"`);
-  return <div className="glass-card form-card flodesk-card" data-flodesk-embed="native"><div className="flodesk-embed" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: embed }} /><FlodeskRedirect /></div>;
+  const embed = source
+    .replace(/data-ff-config="[^"]+"/, `data-ff-config="${redirectConfig}"`)
+    .replace('Book a call with me&gt;', 'Get My Free Marketing Plan →');
+  return <div className="glass-card form-card flodesk-card" data-flodesk-embed="native" data-form-version="flodesk-v2"><div className="flodesk-embed" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: embed }} /><FlodeskRedirect /></div>;
 }
